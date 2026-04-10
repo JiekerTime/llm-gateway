@@ -1,0 +1,28 @@
+# ---------------------------------------------------------------------------
+# Exclude from Docker build context
+# ---------------------------------------------------------------------------
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Documentation (not needed in container)
+*.md
+LICENSE
+
+# Runtime logs (mounted as volume, not baked into image)
+logs/
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Dev / CI files
+.env
+.env.*
+.editorconfig

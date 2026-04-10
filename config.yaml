@@ -1,0 +1,142 @@
+port: 8525
+api_key: "change-me"
+log_dir: "logs"
+
+# ---------------------------------------------------------------------------
+# Backend definitions
+# ---------------------------------------------------------------------------
+backends:
+  deepseek:
+    type: openai_compat                    # uses openai SDK (AsyncOpenAI)
+    base_url: "https://api.deepseek.com"
+    api_key_env: "DEEPSEEK_API_KEY"
+    default_model: "deepseek-chat"
+    timeout: 120
+    max_concurrent: 15                     # per-backend concurrency cap
+    priority: 1                            # 1 = highest (primary)
+
+  ollama:
+    type: ollama
+    base_url: "http://localhost:11434"       # adjust if Ollama runs elsewhere
+    default_model: "qwen2.5:7b"
+    timeout: 300
+    max_concurrent: 3                      # Ollama is resource-constrained
+    keep_alive: "5m"
+    priority: 2                            # fallback
+
+# ---------------------------------------------------------------------------
+# Global defaults
+# ---------------------------------------------------------------------------
+default_model: "deepseek-chat"
+default_backend: "deepseek"
+
+# ---------------------------------------------------------------------------
+# Routing rules (first match wins, by caller_pattern)
+# When no rule matches, default_backend + default_model is used.
+#
+# Each rule is a "policy" with:
+#   backend, model, priority, cacheable, fallback_allowed, max_context_tokens
+# ---------------------------------------------------------------------------
+routing_rules:
+  # Example: route "critical/*" callers with high priority, no fallback
+  # - caller_pattern: "critical/*"
+  #   backend: "deepseek"
+  #   model: "deepseek-chat"
+  #   priority: "high"
+  #   cacheable: true
+  #   fallback_allowed: false
+  #   max_context_tokens: 32000
+
+  # Default catch-all rule
+  - caller_pattern: "*"
+    backend: "deepseek"
+    model: "deepseek-chat"
+    priority: "normal"
+    cacheable: true
+    fallback_allowed: true
+    max_context_tokens: 32000
+
+# ---------------------------------------------------------------------------
+# Fallback chain (tried in order when primary backend is circuit-broken)
+# ---------------------------------------------------------------------------
+fallback_chain:
+  - deepseek
+  - ollama
+
+# ---------------------------------------------------------------------------
+# Retry
+# ---------------------------------------------------------------------------
+retry:
+  max_attempts: 3
+  backoff_seconds: 2.0
+  backoff_multiplier: 1.5                  # exponential backoff
+
+# ---------------------------------------------------------------------------
+# Circuit breaker (per-backend)
+# ---------------------------------------------------------------------------
+circuit_breaker:
+  failure_threshold: 5                     # consecutive failures to trip
+  recovery_timeout_s: 60                   # seconds before half-open probe
+  half_open_limit: 1                       # max probe requests in half-open
+
+# ---------------------------------------------------------------------------
+# Global concurrency limit (safety net across all backends)
+# ---------------------------------------------------------------------------
+concurrency:
+  max_concurrent: 20
+
+# ---------------------------------------------------------------------------
+# Token accounting
+# ---------------------------------------------------------------------------
+token_accounting:
+  flush_interval_s: 300                    # flush to disk every 5 min
+  stats_file: "logs/token_stats.jsonl"
+
+# ---------------------------------------------------------------------------
+# Prompt logging
+# ---------------------------------------------------------------------------
+prompt_logging:
+  enabled: true
+  log_dir: "logs/llm_calls"
+  include_content: true                    # false = metadata only
+  max_content_chars: 4000                  # truncate prompt/response preview
+
+# ---------------------------------------------------------------------------
+# Pricing (for /stats cost estimation)
+# ---------------------------------------------------------------------------
+pricing:
+  deepseek_chat_input_per_1m: 0.27        # USD per 1M input tokens
+  deepseek_chat_output_per_1m: 1.10       # USD per 1M output tokens
+
+# ---------------------------------------------------------------------------
+# Session management
+# ---------------------------------------------------------------------------
+sessions:
+  enabled: true
+  db_path: "data_runtime/sessions.db"
+  default_ttl_hours: 24
+  cleanup_interval_s: 3600
+
+# ---------------------------------------------------------------------------
+# Role cards
+# ---------------------------------------------------------------------------
+role_cards:
+  card_dir: "data/role_cards"
+  cards:
+    gp-default-expert:
+      display_name: "GP Expert"
+      system_prompt: "You are a long-lived expert persona inside group-portrait."
+      personality:
+        content: "Calm, analytical, opinionated only when evidence is sufficient."
+        priority: 0
+      knowledge:
+        content: "You maintain continuity across the same session and should build on prior context instead of reintroducing your identity every turn."
+        priority: 1
+      constraints:
+        content: "Prefer concise, structured reasoning. Surface uncertainty explicitly. Do not invent private facts."
+        priority: 2
+      style:
+        content: "Lead with the answer, then supporting reasoning."
+        priority: 3
+      max_history_turns: 80
+      max_history_tokens: 12000
