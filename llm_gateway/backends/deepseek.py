@@ -11,7 +11,7 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from llm_gateway.backends.base import BaseBackend
-from llm_gateway.models.request import ResponseFormat, ToolCall, ToolDefinition
+from llm_gateway.models.request import ReasoningEffort, ResponseFormat, ThinkingMode, ToolCall, ToolDefinition
 from llm_gateway.models.response import BackendResult, StreamEvent
 from llm_gateway.models.stats import UsageInfo
 
@@ -25,6 +25,7 @@ class DeepSeekBackend(BaseBackend):
         api_key_env = config.get("api_key_env", "DEEPSEEK_API_KEY")
         api_key = os.environ.get(api_key_env, "")
         base_url = config.get("base_url", "https://api.deepseek.com")
+        self._default_thinking: ThinkingMode | None = config.get("default_thinking")
 
         self._client = AsyncOpenAI(
             api_key=api_key,
@@ -41,6 +42,8 @@ class DeepSeekBackend(BaseBackend):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> BackendResult:
         async with self._semaphore:
             self._active_calls += 1
@@ -53,6 +56,8 @@ class DeepSeekBackend(BaseBackend):
                     tools,
                     tool_choice,
                     response_format,
+                    thinking,
+                    reasoning_effort,
                 )
             finally:
                 self._active_calls -= 1
@@ -66,6 +71,8 @@ class DeepSeekBackend(BaseBackend):
         tools: list[ToolDefinition] | None,
         tool_choice: str | None,
         response_format: ResponseFormat | None,
+        thinking: ThinkingMode | None,
+        reasoning_effort: ReasoningEffort | None,
     ) -> BackendResult:
         prepared_messages = _prepare_messages_for_response_format(messages, response_format)
         kwargs: dict[str, Any] = {
@@ -81,6 +88,12 @@ class DeepSeekBackend(BaseBackend):
             kwargs["tool_choice"] = tool_choice
         if response_format and response_format.type != "text":
             kwargs["response_format"] = _to_openai_response_format(response_format)
+        _apply_deepseek_v4_options(
+            kwargs,
+            thinking=thinking,
+            reasoning_effort=reasoning_effort,
+            default_thinking=self._default_thinking,
+        )
 
         response = await self._client.chat.completions.create(**kwargs)
         choice = response.choices[0]
@@ -127,6 +140,8 @@ class DeepSeekBackend(BaseBackend):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> AsyncIterator[StreamEvent]:
         async with self._semaphore:
             self._active_calls += 1
@@ -139,6 +154,8 @@ class DeepSeekBackend(BaseBackend):
                     tools,
                     tool_choice,
                     response_format,
+                    thinking,
+                    reasoning_effort,
                 ):
                     yield event
             finally:
@@ -161,6 +178,8 @@ class DeepSeekBackend(BaseBackend):
         tools: list[ToolDefinition] | None,
         tool_choice: str | None,
         response_format: ResponseFormat | None,
+        thinking: ThinkingMode | None,
+        reasoning_effort: ReasoningEffort | None,
     ) -> AsyncIterator[StreamEvent]:
         prepared_messages = _prepare_messages_for_response_format(messages, response_format)
         kwargs: dict[str, Any] = {
@@ -178,6 +197,12 @@ class DeepSeekBackend(BaseBackend):
             kwargs["tool_choice"] = tool_choice
         if response_format and response_format.type != "text":
             kwargs["response_format"] = _to_openai_response_format(response_format)
+        _apply_deepseek_v4_options(
+            kwargs,
+            thinking=thinking,
+            reasoning_effort=reasoning_effort,
+            default_thinking=self._default_thinking,
+        )
 
         stream = await self._client.chat.completions.create(**kwargs)
         yielded_start = False
@@ -260,6 +285,24 @@ def _to_openai_response_format(response_format: ResponseFormat) -> dict:
             },
         }
     raise ValueError(f"Unsupported response_format type: {response_format.type}")
+
+
+def _apply_deepseek_v4_options(
+    kwargs: dict[str, Any],
+    *,
+    thinking: ThinkingMode | None,
+    reasoning_effort: ReasoningEffort | None,
+    default_thinking: ThinkingMode | None,
+) -> None:
+    """Apply DeepSeek V4-only options while using the OpenAI SDK surface."""
+    thinking_mode = thinking or default_thinking
+    if thinking_mode:
+        extra_body = dict(kwargs.get("extra_body") or {})
+        extra_body["thinking"] = {"type": thinking_mode}
+        kwargs["extra_body"] = extra_body
+
+    if reasoning_effort and thinking_mode != "disabled":
+        kwargs["reasoning_effort"] = reasoning_effort
 
 
 def _prepare_messages_for_response_format(

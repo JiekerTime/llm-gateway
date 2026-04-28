@@ -2,7 +2,9 @@
 from llm_gateway.models.request import (
     ChatRequest,
     JsonSchemaDefinition,
+    ReasoningEffort,
     ResponseFormat,
+    ThinkingMode,
     ToolCall,
     ToolDefinition,
     ToolResult,
@@ -24,7 +26,9 @@ from llm_gateway.models.stats import (
 __all__ = [
     "ChatRequest",
     "JsonSchemaDefinition",
+    "ReasoningEffort",
     "ResponseFormat",
+    "ThinkingMode",
     "ToolCall",
     "ToolDefinition",
     "ToolResult",

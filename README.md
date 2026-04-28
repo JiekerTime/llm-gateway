@@ -85,10 +85,12 @@ Main inference endpoint (OpenAI-compatible).
     {"role": "system", "content": "You are a helpful assistant."},
     {"role": "user", "content": "Summarize this article."}
   ],
-  "model": "deepseek-chat",
+  "model": "deepseek-v4-flash",
   "temperature": 0.7,
   "max_tokens": 800,
   "stream": false,
+  "thinking": "disabled",
+  "reasoning_effort": "high",
   "session_id": "sess_demo",
   "role_card": "gp-default-expert",
   "dimension_overrides": {
@@ -104,6 +106,8 @@ Main inference endpoint (OpenAI-compatible).
 - **`model`** — optional, defaults to `default_model` in `config.yaml`
 - **`caller`** — required, format `module/subtype`, used for routing and accounting
 - **`stream`** — optional, when `true` the gateway returns `text/event-stream`
+- **`thinking`** — optional DeepSeek V4 switch: `"enabled"` / `"disabled"`; the default config sends `"disabled"` to preserve old `deepseek-chat` behavior
+- **`reasoning_effort`** — optional DeepSeek V4 thinking effort: `"high"` or `"max"`; compatibility values `"low"`, `"medium"`, and `"xhigh"` are accepted and mapped by DeepSeek
 - **`session_id`** — optional, enables persistent history when present
 - **`role_card`** — optional, injects a reusable persona; with `session_id` it also binds the session to that card
 - **`dimension_overrides`** — optional per-request role-card overrides, e.g. `scenario`, `constraints`
@@ -118,7 +122,7 @@ Main inference endpoint (OpenAI-compatible).
 ```json
 {
   "content": "The article discusses...",
-  "model": "deepseek-chat",
+  "model": "deepseek-v4-flash",
   "usage": {
     "prompt_tokens": 1234,
     "completion_tokens": 456,
@@ -172,7 +176,7 @@ data: {"type":"text_delta","delta":"{"}
 
 data: {"type":"structured_partial","structured_target":"message","structured_value":{"title":null}}
 
-data: {"type":"done","stop_reason":"stop","backend":"deepseek","model":"deepseek-chat"}
+data: {"type":"done","stop_reason":"stop","backend":"deepseek","model":"deepseek-v4-flash"}
 ```
 
 **Error (502 — all backends failed):**
@@ -246,7 +250,7 @@ Query params:
       "caller": "myapp/summarizer",
       "session_id": "sess_demo",
       "role_card": "gp-default-expert",
-      "model": "deepseek-chat",
+      "model": "deepseek-v4-flash",
       "backend": "deepseek",
       "stream": true,
       "response_format_type": "json_object",
@@ -261,6 +265,76 @@ Query params:
   ]
 }
 ```
+
+---
+
+### GET /usage/sources
+
+Source-level usage analysis from persisted per-call logs. Use this when call
+volume spikes and you need to identify which app/caller caused it. Requires API
+Key.
+
+Query params:
+- `since` — ISO 8601 timestamp or duration like `24h`, `7d` (default: `24h`)
+- `caller` — optional caller prefix filter, e.g. `gp/`
+- `limit` — default 20, max 100
+
+```json
+{
+  "period": "2026-04-27T00:00:00+00:00Z / 2026-04-27T12:00:00+00:00Z",
+  "total": {
+    "calls": 238,
+    "prompt_tokens": 98234,
+    "completion_tokens": 28901,
+    "total_tokens": 127135,
+    "cache_hit_tokens": 61440
+  },
+  "by_service": [
+    {
+      "service": "group-portrait",
+      "calls": 184,
+      "prompt_tokens": 80123,
+      "completion_tokens": 21000,
+      "total_tokens": 101123,
+      "cache_hit_tokens": 55000,
+      "avg_latency_ms": 1823.5,
+      "first_seen": "2026-04-27T00:10:00+00:00Z",
+      "last_seen": "2026-04-27T11:58:00+00:00Z",
+      "top_callers": [
+        {"caller": "gp/weekly-health", "total_tokens": 62000}
+      ]
+    }
+  ],
+  "by_source": [
+    {
+      "source": "gp",
+      "calls": 184,
+      "prompt_tokens": 80123,
+      "completion_tokens": 21000,
+      "total_tokens": 101123,
+      "cache_hit_tokens": 55000,
+      "avg_latency_ms": 1823.5,
+      "first_seen": "2026-04-27T00:10:00+00:00Z",
+      "last_seen": "2026-04-27T11:58:00+00:00Z",
+      "top_callers": [
+        {"caller": "gp/weekly-health", "total_tokens": 62000}
+      ]
+    }
+  ],
+  "by_caller": [],
+  "by_model": [],
+  "by_backend": [],
+  "by_role_card": [],
+  "by_session": [],
+  "recent_heavy_calls": []
+}
+```
+
+### GET /usage
+
+Built-in visual usage dashboard. Open it in a browser, enter the API key, then
+filter by time window and caller prefix. The page calls `/usage/sources` and
+shows source/caller/model/role-card rankings plus recent heavy calls.
 
 ---
 
@@ -348,7 +422,8 @@ backends:
     type: openai_compat        # uses openai SDK (AsyncOpenAI)
     base_url: "https://api.deepseek.com"
     api_key_env: "DEEPSEEK_API_KEY"
-    default_model: "deepseek-chat"
+    default_model: "deepseek-v4-flash"
+    default_thinking: "disabled"
     timeout: 120
     priority: 1                # 1 = highest (primary)
 
@@ -362,7 +437,7 @@ backends:
 routing_rules:
   - caller_pattern: "*"
     backend: "deepseek"
-    model: "deepseek-chat"
+    model: "deepseek-v4-flash"
 
 fallback_chain:
   - deepseek
@@ -415,7 +490,7 @@ Requires API Key.
   "backends": {
     "deepseek": {
       "status": "ok",
-      "model": "deepseek-chat",
+      "model": "deepseek-v4-flash",
       "circuit_state": "closed",
       "consecutive_failures": 0,
       "max_concurrent": 15,

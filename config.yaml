@@ -10,7 +10,8 @@ backends:
     type: openai_compat                    # uses openai SDK (AsyncOpenAI)
     base_url: "https://api.deepseek.com"
     api_key_env: "DEEPSEEK_API_KEY"
-    default_model: "deepseek-chat"
+    default_model: "deepseek-v4-flash"
+    default_thinking: "disabled"           # preserve old deepseek-chat non-thinking semantics
     timeout: 120
     max_concurrent: 15                     # per-backend concurrency cap
     priority: 1                            # 1 = highest (primary)
@@ -27,7 +28,7 @@ backends:
 # ---------------------------------------------------------------------------
 # Global defaults
 # ---------------------------------------------------------------------------
-default_model: "deepseek-chat"
+default_model: "deepseek-v4-flash"
 default_backend: "deepseek"
 
 # ---------------------------------------------------------------------------
@@ -41,7 +42,7 @@ routing_rules:
   # Example: route "critical/*" callers with high priority, no fallback
   # - caller_pattern: "critical/*"
   #   backend: "deepseek"
-  #   model: "deepseek-chat"
+  #   model: "deepseek-v4-flash"
   #   priority: "high"
   #   cacheable: true
   #   fallback_allowed: false
@@ -50,7 +51,7 @@ routing_rules:
   # Default catch-all rule
   - caller_pattern: "*"
     backend: "deepseek"
-    model: "deepseek-chat"
+    model: "deepseek-v4-flash"
     priority: "normal"
     cacheable: true
     fallback_allowed: true

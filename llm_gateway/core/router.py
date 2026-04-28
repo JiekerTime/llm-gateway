@@ -61,7 +61,7 @@ class Router:
 
     rules: list[RoutingRule] = field(default_factory=list)
     default_backend: str = "deepseek"
-    default_model: str = "deepseek-chat"
+    default_model: str = "deepseek-v4-flash"
 
     @classmethod
     def from_config(cls, config: dict) -> Router:
@@ -71,7 +71,7 @@ class Router:
             rules.append(RoutingRule(
                 caller_pattern=raw.get("caller_pattern", "*"),
                 backend=raw.get("backend", config.get("default_backend", "deepseek")),
-                model=raw.get("model", config.get("default_model", "deepseek-chat")),
+                model=raw.get("model", config.get("default_model", "deepseek-v4-flash")),
                 priority=raw.get("priority", "normal"),
                 cacheable=raw.get("cacheable", True),
                 fallback_allowed=raw.get("fallback_allowed", True),
@@ -81,7 +81,7 @@ class Router:
         return cls(
             rules=rules,
             default_backend=config.get("default_backend", "deepseek"),
-            default_model=config.get("default_model", "deepseek-chat"),
+            default_model=config.get("default_model", "deepseek-v4-flash"),
         )
 
     def resolve(self, caller: str, model_override: str | None = None) -> RoutePolicy:

@@ -25,7 +25,7 @@ from json import JSONDecodeError
 from uuid import uuid4
 
 from fastapi import FastAPI, Header, HTTPException, Query
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 
 from llm_gateway.backends import BaseBackend, create_backend
 from llm_gateway.config import load_config
@@ -49,6 +49,7 @@ from llm_gateway.models import (
     ToolCall,
     UsageInfo,
 )
+from llm_gateway.usage_page import USAGE_PAGE_HTML
 
 # ---------------------------------------------------------------------------
 # Logging
@@ -256,6 +257,8 @@ async def _chat_sync(request: ChatRequest):
                         tools=request.tools,
                         tool_choice=request.tool_choice,
                         response_format=request.response_format,
+                        thinking=request.thinking,
+                        reasoning_effort=request.reasoning_effort,
                     )
 
                     latency_ms = int((time.monotonic() - call_start) * 1000)
@@ -435,6 +438,8 @@ async def _chat_stream(request: ChatRequest):
                             tools=request.tools,
                             tool_choice=request.tool_choice,
                             response_format=request.response_format,
+                            thinking=request.thinking,
+                            reasoning_effort=request.reasoning_effort,
                         ):
                             if event.type == "message_start":
                                 stream_started = True
@@ -754,6 +759,34 @@ async def stats(
     since_dt = _parse_since(since)
     data = await _token_store.get_stats(since=since_dt, group_by=group_by)
     return data
+
+# ---------------------------------------------------------------------------
+# GET /usage
+# ---------------------------------------------------------------------------
+
+@app.get("/usage", response_class=HTMLResponse)
+async def usage_page():
+    return HTMLResponse(USAGE_PAGE_HTML)
+
+# ---------------------------------------------------------------------------
+# GET /usage/sources
+# ---------------------------------------------------------------------------
+
+@app.get("/usage/sources")
+async def usage_sources(
+    x_api_key: str = Header(default=""),
+    since: str = Query(default="", description="ISO 8601 timestamp or duration like '7d', '24h'"),
+    caller: str = Query(default="", description="Filter by caller prefix"),
+    limit: int = Query(default=20, ge=1, le=100),
+):
+    _check_api_key(x_api_key)
+
+    since_dt = _parse_since(since)
+    return _prompt_logger.get_usage_analysis(
+        since=since_dt,
+        caller=caller or None,
+        limit=limit,
+    )
 
 # ---------------------------------------------------------------------------
 # GET /logs

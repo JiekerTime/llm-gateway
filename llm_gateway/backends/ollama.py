@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 
 from llm_gateway.backends.base import BaseBackend
-from llm_gateway.models.request import ResponseFormat, ToolCall, ToolDefinition
+from llm_gateway.models.request import ReasoningEffort, ResponseFormat, ThinkingMode, ToolCall, ToolDefinition
 from llm_gateway.models.response import BackendResult, StreamEvent
 from llm_gateway.models.stats import UsageInfo
 
@@ -34,6 +34,8 @@ class OllamaBackend(BaseBackend):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> BackendResult:
         async with self._semaphore:
             self._active_calls += 1
@@ -116,6 +118,8 @@ class OllamaBackend(BaseBackend):
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> AsyncIterator[StreamEvent]:
         async with self._semaphore:
             self._active_calls += 1

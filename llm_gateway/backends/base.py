@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
-from llm_gateway.models.request import ResponseFormat, ToolDefinition
+from llm_gateway.models.request import ReasoningEffort, ResponseFormat, ThinkingMode, ToolDefinition
 from llm_gateway.models.response import BackendResult, StreamEvent
 
 class BaseBackend:
@@ -37,6 +37,8 @@ class BaseBackend:
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> BackendResult:
         raise NotImplementedError
 
@@ -49,6 +51,8 @@ class BaseBackend:
         tools: list[ToolDefinition] | None = None,
         tool_choice: str | None = None,
         response_format: ResponseFormat | None = None,
+        thinking: ThinkingMode | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
     ) -> AsyncIterator[StreamEvent]:
         raise NotImplementedError
 

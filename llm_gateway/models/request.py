@@ -3,9 +3,12 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+ThinkingMode = Literal["enabled", "disabled"]
+ReasoningEffort = Literal["high", "max", "low", "medium", "xhigh"]
 
 class ToolDefinition(BaseModel):
     """Caller-provided tool schema, forwarded to the LLM backend."""
@@ -59,6 +62,8 @@ class ChatRequest(BaseModel):
     max_tokens: int = 800
     caller: str = ""
     stream: bool = False
+    thinking: ThinkingMode | None = None
+    reasoning_effort: ReasoningEffort | None = None
 
     # Function Calling (optional)
     tools: list[ToolDefinition] | None = None
@@ -72,3 +77,14 @@ class ChatRequest(BaseModel):
     append_history: bool = True
 
     mode: str = "single_turn"               # reserved for future multi-turn
+
+    @field_validator("thinking", mode="before")
+    @classmethod
+    def normalize_thinking(cls, value: Any) -> Any:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return "enabled" if value else "disabled"
+        if isinstance(value, dict):
+            return value.get("type")
+        return value
